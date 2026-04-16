@@ -1,0 +1,111 @@
+version: '3.1'
+services:
+  wukongim:  # 唐僧叨叨通讯服务（悟空IM）
+    image: registry.cn-shanghai.aliyuncs.com/wukongim/wukongim:v2
+    restart: always
+    ports:
+      # - "5001:5001" # http api端口（业务端调用，仅限内网开放）
+      - "${WK_TCP_PORT}:5100"  # tcp长连接端口（外网开放）
+      - "${WK_WS_PORT}:5200" # websocket端口（外网开放）
+      - "${WK_WEB_SERVER_PORT}:5300" # 监控端口
+    volumes:
+      - ./wukongim:/root/wukongim
+    env_file:
+      - .env
+    environment:
+      - WK_EXTERNAL_IP=${EXTERNAL_IP}
+
+  server:  # 唐僧叨叨的业务服务
+    image: server:v1
+    build:
+      context: ../chinaim-server
+      dockerfile: Dockerfile
+    restart: always
+    command: "api"
+    healthcheck:
+      test: "wget -q -Y off -O /dev/null http://localhost:8090/v1/ping > /dev/null 2>&1"
+      interval: 10s
+      timeout: 10s
+      retries: 3
+    depends_on:
+      - redis
+      - mysql
+      - wukongim
+    ports:
+      - "${TS_API_PORT}:8090"
+    volumes:
+      - ./tsdd:/home/tsdddata
+      - ./tsdd/configs:/home/configs
+    env_file:
+      - .env
+    environment:
+      - TS_DB_MYSQLADDR=root:${MYSQL_ROOT_PASSWORD}@tcp(mysql)/${MYSQL_DATABASE}?charset=utf8mb4&parseTime=true&loc=Local
+      - TS_EXTERNAL_IP=${EXTERNAL_IP}
+      - TS_FILESERVICE=${TS_FILESERVICE}
+      - TS_MINIO_ACCESSKEYID=${MINIO_ROOT_USER}
+      - TS_MINIO_SECRETACCESSKEY=${MINIO_ROOT_PASSWORD}
+
+  web:  # 唐僧叨叨的web服务
+    image: web:v1
+    build:
+      context: ../chinaim-web
+      dockerfile: Dockerfile
+    restart: always
+    environment:
+      - API_URL=http://server:8090/
+    ports:
+      - "${TS_WEB_PORT}:80"
+
+  manager:  # 唐僧叨叨的后台管理系统
+    image: houtai:v1
+    build:
+      context: ../chinaim-manager
+      dockerfile: Dockerfile
+    restart: always
+    environment:
+      - API_URL=http://server:8090/
+      # 用户端 Web 对外根地址（默认与 .env 中 EXTERNAL_IP + TS_WEB_PORT 一致）；可在 .env 中单独设置 CLIENT_WEB_URL 覆盖
+      - CLIENT_WEB_URL=${CLIENT_WEB_URL:-http://${EXTERNAL_IP}:${TS_WEB_PORT}}
+    ports:
+      - "${TS_MANAGEMENT_PORT}:80"
+
+  minio: # minio文件管理服务
+    image: registry.cn-shanghai.aliyuncs.com/wukongim/minio:RELEASE.2023-07-18T17-49-40Z
+    expose:
+      - "9000"
+      - "9001"
+    command: "server /data --console-address ':9001'"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      - MINIO_ROOT_USER=${MINIO_ROOT_USER}
+      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    volumes:
+      - ./miniodata:/data
+
+  mysql:  # mysql数据库
+    image: registry.cn-shanghai.aliyuncs.com/wukongim/mysql:8.0.33
+    command: --default-authentication-plugin=mysql_native_password
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+    volumes:
+      - ./mysqldata:/var/lib/mysql
+    environment:
+      - TZ=Asia/Shanghai
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+      - MYSQL_DATABASE=${MYSQL_DATABASE}
+
+  redis:  # redis
+    image: registry.cn-shanghai.aliyuncs.com/wukongim/redis:7.2.3
+    restart: always
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 1s
+      timeout: 3s
+      retries: 30

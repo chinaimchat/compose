@@ -1,0 +1,13 @@
+# 本地真实密钥（勿提交）
+.env.private
+
+# 数据库与对象存储数据目录（体积大、且含业务数据）
+mysqldata/
+miniodata/
+
+# 悟空 IM 运行时数据（体积大）
+wukongim/
+
+# 业务容器挂载目录中的日志
+tsdd/logs/
+*.log
