@@ -64,6 +64,19 @@ docker compose up -d
 
 首次构建会编 **wukongim**（Dockerfile 内含前端 `yarn build` + Go）、**server / web / manager** 等，耗时正常偏长。
 
+#### 近似「一键」（已克隆五仓库、`.env` 已改好强密码后）
+
+在 **`compose/`** 下执行（**第一个参数必须是公网 IPv4**，不要用域名代替；域名可选写在第二参数作为用户端根地址）：
+
+```bash
+sh scripts/bootstrap-new-host.sh 你的公网IP
+# 若用户端用 HTTPS 域名访问 Web，可同时写入 CLIENT_WEB_URL：
+sh scripts/bootstrap-new-host.sh 你的公网IP https://im.example.com
+```
+
+脚本会：检查同级 `wukongim` 等目录 → 写 **`EXTERNAL_IP`**、**`TS_MINIO_DOWNLOADURL`**（`http://IP:9000`）→（可选）**`CLIENT_WEB_URL`** → **`docker compose build` + `up -d`** → 等 MinIO 健康后跑 **`sticker-seed`**。  
+**不会**替你生成强密码；若 `.env` 里仍是仓库模板那种纯 `*` 密码会直接退出。可选 `--skip-build` / `--skip-seed` 见脚本内 `usage`。
+
 ### 3. 表情商店贴纸种子（只做一次即可，可重复执行）
 
 MinIO 里 **`file/preview/sticker/`** 的矢量贴纸**不在**整库 `miniodata` 的 Git 里；仓库带了 **`seed/`**。
