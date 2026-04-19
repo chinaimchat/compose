@@ -1,7 +1,10 @@
 version: '3.1'
 services:
-  wukongim:  # 唐僧叨叨通讯服务（悟空IM）
-    image: registry.cn-shanghai.aliyuncs.com/wukongim/wukongim:v2
+  wukongim:  # 唐僧叨叨通讯服务（悟空 IM）；本地构建 sibling 源码（Dockerfile 内含 yarn build + go build）
+    image: wukongim:local
+    build:
+      context: ../wukongim
+      dockerfile: Dockerfile
     restart: always
     ports:
       # - "5001:5001" # http api端口（业务端调用，仅限内网开放）
@@ -52,7 +55,8 @@ services:
       dockerfile: Dockerfile
     restart: always
     environment:
-      - API_URL=http://server:8090/
+      - API_URL=${INTERNAL_API_URL:-http://server:8090/}
+      - WEB_SERVER_NAME=${WEB_SERVER_NAME:-localhost}
     ports:
       - "${TS_WEB_PORT}:80"
 
@@ -63,7 +67,8 @@ services:
       dockerfile: Dockerfile
     restart: always
     environment:
-      - API_URL=http://server:8090/
+      - API_URL=${INTERNAL_API_URL:-http://server:8090/}
+      - MANAGER_SERVER_NAME=${MANAGER_SERVER_NAME:-localhost}
       # 用户端 Web 对外根地址（默认与 .env 中 EXTERNAL_IP + TS_WEB_PORT 一致）；可在 .env 中单独设置 CLIENT_WEB_URL 覆盖
       - CLIENT_WEB_URL=${CLIENT_WEB_URL:-http://${EXTERNAL_IP}:${TS_WEB_PORT}}
     ports:

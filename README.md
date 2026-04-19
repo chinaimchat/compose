@@ -9,6 +9,7 @@ Docker Compose 编排：唐僧叨叨（`server` / `web` / `manager`）+ MySQL + 
 ```text
 <工作区父目录>/
   compose/              # 本仓库
+  wukongim/             # 悟空 IM 源码（`wukongim` 服务 `build.context` 指向此处）
   chinaim-server/       # 业务后端
   chinaim-web/          # 用户端 Web
   chinaim-manager/      # 管理后台
@@ -16,11 +17,46 @@ Docker Compose 编排：唐僧叨叨（`server` / `web` / `manager`）+ MySQL + 
 
 若路径不同，请修改 `docker-compose.yaml` 里各服务的 `build.context`。
 
+主栈 `wukongim` 使用**本地镜像构建**（`image: wukongim:local`），不在 compose 里拉取阿里云 IM 镜像；构建逻辑与 `wukongim` 仓库根目录 `Dockerfile` 一致（容器内先打 `web/`、`demo/chatdemo/` 再 `go build`）。
+
 ## 环境变量（`.env`）
 
 - 仓库中的 `.env` 为**脱敏示例**（敏感位为 `*`），仅说明变量含义与格式。
 - 部署时：复制为 `.env` 后填入真实密码、公网 IP、JWT 密钥等。
 - **切勿**将含真实密码的 `.env` 推送到公开仓库；本地可自行保留 `.env.private` 备份（已在 `.gitignore` 中忽略）。
+
+### 迁移到新服务器时最少改动
+
+原则：尽量只改 `.env`，不要改源码中的域名。
+
+- 对外访问域名：
+  - `CLIENT_WEB_URL`（用户端 Web 地址）
+- 容器内反代设置：
+  - `INTERNAL_API_URL`（默认 `http://server:8090/`，通常不改）
+  - `WEB_SERVER_NAME`（web 容器 Nginx `server_name`）
+  - `MANAGER_SERVER_NAME`（manager 容器 Nginx `server_name`）
+
+改完 `.env` 后重建：
+
+```bash
+docker compose build web manager
+docker compose up -d web manager
+```
+
+**Web 镜像构建提速**：`chinaim-web` 的 `Dockerfile` 已将 `yarn install` 与源码分层，并启用 Yarn 缓存挂载；日常重建 **Web** 请用 `docker compose build web`，**避免习惯性加 `--no-cache`**，否则会整包重装依赖。若新增 `apps/*` / `packages/*` workspace，需在 `chinaim-web/Dockerfile` 中补充对应 `COPY …/package.json` 行（详见 **`../chinaim-web/README.md`** 中「Docker 镜像构建（提速与维护）」）。
+
+### 发布前域名残留检查
+
+```bash
+sh compose/scripts/check-legacy-domains.sh
+```
+
+- 默认检查历史域名：`sdsf1.com`、`xh-gc.com`
+- 可附加自定义待检查域名：
+
+```bash
+sh compose/scripts/check-legacy-domains.sh old-domain.com test.example.com
+```
 
 ## 常用命令
 
@@ -37,6 +73,12 @@ docker compose up -d
 docker compose build manager && docker compose up -d manager
 ```
 
+仅重建用户端 Web（依赖未改时通常较快）：
+
+```bash
+docker compose build web && docker compose up -d web
+```
+
 ## 管理后台「以此用户视角查看」
 
 - `manager` 服务环境变量 `CLIENT_WEB_URL` 默认由 compose 写为 `http://${EXTERNAL_IP}:${TS_WEB_PORT}`，也可在 `.env` 中设置 `CLIENT_WEB_URL` 覆盖（例如 HTTPS 域名）。
@@ -45,3 +87,4 @@ docker compose build manager && docker compose up -d manager
 ## 其他编排文件
 
 - `docker-compose.cluster.yaml`、`docker-compose.gateway.yaml`、`docker-compose.monitor.yaml` 为扩展/参考用途，默认主栈以 `docker-compose.yaml` 为准。
+- `docker-compose.cluster.yaml` 中 IM 节点同样 `build: ../wukongim`，需同级存在 `wukongim`；集群用到的 `./nginx.conf`、`./prometheus.yml` 等请自备（可参考 `wukongim/docker/cluster/`）。

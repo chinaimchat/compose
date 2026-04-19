@@ -1,9 +1,10 @@
 version: '3.7'
 
-x-wukongim-common: &wukongim-common  # 公共配置
+x-wukongim-common: &wukongim-common  # 公共配置（与主栈一致：../wukongim + 根目录 Dockerfile）
     # image: registry.cn-shanghai.aliyuncs.com/wukongim/wukongim:v2.0.10-20241221-dev
+    image: wukongim:local
     build:
-      context: ../../
+      context: ../wukongim
       dockerfile: Dockerfile
     healthcheck:
       test: "wget -q -Y off -O /dev/null http://localhost:5001/health > /dev/null 2>&1"
