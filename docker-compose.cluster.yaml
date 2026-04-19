@@ -76,8 +76,8 @@ services:
         - node3.wk.local
     volumes:
       - ./wukongim3_data:/root/wukongim  
-  prometheus: 
-    image: registry.cn-shanghai.aliyuncs.com/wukongim/prometheus:v2.53.1
+  prometheus:
+    image: prom/prometheus:v2.53.1
     volumes:
       - "./prometheus.yml:/etc/prometheus/prometheus.yml"
     networks:
