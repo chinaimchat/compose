@@ -1,0 +1,87 @@
+# 宿主机 Nginx 反代示例（可提交到 Git）
+# -----------------------------------------------------------------------------
+# 用途：在宿主机上监听 80，将域名分流到本机 compose 已映射的端口：
+#   /v1/  → 业务 API（默认 8090）
+#   /     → 用户端 Web（默认 82）
+# 管理后台单独 server_name → 默认 83
+#
+# 使用步骤：
+#   cp http-reverse-proxy.conf.example http-reverse-proxy.conf
+#   编辑 http-reverse-proxy.conf：把 example.com / admin.example.com 换成你的域名，
+#   按需把 host.docker.internal 改为 127.0.0.1（Linux 无 Docker Desktop 时常见）。
+#
+# 注意：真实文件 http-reverse-proxy.conf 已列入 .gitignore，勿提交含生产域名的版本。
+# -----------------------------------------------------------------------------
+
+worker_processes auto;
+
+events {
+    worker_connections 1024;
+}
+
+http {
+    map $http_upgrade $connection_upgrade {
+        default upgrade;
+        ''      close;
+    }
+
+    server {
+        listen 80;
+        listen [::]:80;
+        # 用户端 Web 与 API 共用域名时：浏览器访问的根路径走静态站，/v1/ 走 API
+        server_name im.example.com www.im.example.com;
+
+        client_max_body_size 1000m;
+
+        location /v1/ {
+            proxy_http_version 1.1;
+            proxy_set_header Connection "";
+            proxy_set_header Host              $host;
+            proxy_set_header X-Real-IP         $remote_addr;
+            proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header X-Forwarded-Host  $host;
+            proxy_set_header token             $http_token;
+            proxy_set_header Authorization     $http_authorization;
+            proxy_set_header X-Token           $http_x_token;
+            proxy_set_header X-Access-Token    $http_x_access_token;
+            proxy_set_header appid             $http_appid;
+            proxy_set_header package           $http_package;
+            proxy_set_header os                $http_os;
+            proxy_set_header model             $http_model;
+            proxy_set_header version           $http_version;
+            proxy_read_timeout  600s;
+            proxy_send_timeout  600s;
+            proxy_request_buffering off;
+            proxy_pass http://host.docker.internal:8090;
+        }
+
+        location / {
+            proxy_http_version 1.1;
+            proxy_set_header Host              $host;
+            proxy_set_header X-Real-IP         $remote_addr;
+            proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header Upgrade           $http_upgrade;
+            proxy_set_header Connection        $connection_upgrade;
+            proxy_pass http://host.docker.internal:82;
+        }
+    }
+
+    server {
+        listen 80;
+        listen [::]:80;
+        server_name admin.example.com;
+
+        location / {
+            proxy_http_version 1.1;
+            proxy_set_header Host              $host;
+            proxy_set_header X-Real-IP         $remote_addr;
+            proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header Upgrade           $http_upgrade;
+            proxy_set_header Connection        $connection_upgrade;
+            proxy_pass http://host.docker.internal:83;
+        }
+    }
+}

@@ -25,6 +25,24 @@ Docker Compose 编排：唐僧叨叨（`server` / `web` / `manager`）+ MySQL + 
 - 部署时：复制为 `.env` 后填入真实密码、公网 IP、JWT 密钥等。
 - **切勿**将含真实密码的 `.env` 推送到公开仓库；本地可自行保留 `.env.private` 备份（已在 `.gitignore` 中忽略）。
 
+### 宿主机 Nginx 反代（可选）
+
+若在生产或本机**宿主机**上再跑一层 Nginx，把公网域名指到 compose 已映射的端口（默认 API `8090`、用户 Web `82`、管理后台 `83`），可使用仓库中的示例配置：
+
+| 文件 | 是否提交 Git | 说明 |
+|------|----------------|------|
+| **`http-reverse-proxy.conf.example`** | **是** | 占位域名 `im.example.com`、`admin.example.com`，上游为 `host.docker.internal`（与常见 Docker Desktop 一致）。 |
+| **`http-reverse-proxy.conf`** | **否**（`.gitignore`） | 由示例复制后本地修改，写入真实域名；**勿提交**，避免泄露生产域名与拓扑。 |
+
+初始化命令：
+
+```bash
+cp http-reverse-proxy.conf.example http-reverse-proxy.conf
+# 编辑 http-reverse-proxy.conf：替换 server_name、必要时将 host.docker.internal 改为 127.0.0.1
+```
+
+请与 `.env` 里的 **`WEB_SERVER_NAME`、`MANAGER_SERVER_NAME`**（容器内 Nginx 的 `server_name`）及 **`CLIENT_WEB_URL`** 使用**同一套域名策略**（HTTPS、证书、多域名等需在宿主机与容器两侧一致规划）。
+
 ### 迁移到新服务器时最少改动
 
 原则：尽量只改 `.env`，不要改源码中的域名。
