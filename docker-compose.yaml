@@ -44,6 +44,10 @@ services:
     environment:
       - TS_DB_MYSQLADDR=root:${MYSQL_ROOT_PASSWORD}@tcp(mysql)/${MYSQL_DATABASE}?charset=utf8mb4&parseTime=true&loc=Local
       - TS_EXTERNAL_IP=${EXTERNAL_IP}
+      # 二维码 / 邀请链接 / 扫码登录 等对外 URL 的根地址；不显式配会回退到 IP+API_PORT，
+      # 导致客户端二维码里出现 http://<IP>:8090/v1/qrcode/...，既丑又泄露内部端口。
+      - TS_EXTERNAL_BASEURL=${TS_EXTERNAL_BASEURL:-http://${EXTERNAL_IP}:${TS_API_PORT}}
+      - TS_EXTERNAL_H5BASEURL=${TS_EXTERNAL_H5BASEURL:-${TS_EXTERNAL_BASEURL:-http://${EXTERNAL_IP}:${TS_API_PORT}}}
       - TS_FILESERVICE=${TS_FILESERVICE}
       - TS_MINIO_ACCESSKEYID=${MINIO_ROOT_USER}
       - TS_MINIO_SECRETACCESSKEY=${MINIO_ROOT_PASSWORD}

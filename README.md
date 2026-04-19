@@ -123,10 +123,61 @@ docker compose build manager && docker compose up -d manager
 docker compose build web && docker compose up -d web
 ```
 
+### ⚠️ 重新构建 / 重建 `server` 时必须连同 `web` `manager` 一起重启
+
+`web`、`manager` 容器内 Nginx 的 `proxy_pass http://server:8090/` 在 worker
+启动时会把 `server` 解析为静态 IP 并**永久缓存**。若单独 `--build` 或
+`--force-recreate` 了 `server`，新容器会拿到新的 docker network IP，旧 IP
+甚至可能被复用给别的容器，导致 `web/manager` 把 `/api/...` 反代到错误的
+后端，出现 502（`connect() failed (111: Connection refused)`），表现为
+**「后台/Web 接口全部失败、看起来什么数据都没有」**（数据库没事）。
+
+**两种推荐做法（任选其一）：**
+
+```bash
+# 1) 一行命令：连同 web、manager 一并强制重建，让它们重新解析 server 的 IP
+docker compose up -d --build --force-recreate server web manager
+
+# 2) 分步骤：用仓库自带脚本（先重建 server，等 healthy 后重启 web、manager）
+sh scripts/rebuild-server.sh            # = build + recreate server，再 restart web manager
+sh scripts/rebuild-server.sh --no-build # 仅 recreate server（不重新打镜像）
+```
+
+> 不要只跑 `docker compose up -d --build server`，否则 `web` / `manager` 内
+> Nginx 仍会指向旧 IP。
+
 ## 管理后台「以此用户视角查看」
 
 - `manager` 服务环境变量 `CLIENT_WEB_URL` 默认由 compose 写为 `http://${EXTERNAL_IP}:${TS_WEB_PORT}`，也可在 `.env` 中设置 `CLIENT_WEB_URL` 覆盖（例如 HTTPS 域名）。
 - 镜像启动时会把该值写入 `tsdd-config.js` 供前端读取（见 [chinaimchat/manager](https://github.com/chinaimchat/manager) 仓库）。
+
+## 后端对外 BaseURL（`TS_EXTERNAL_BASEURL`）
+
+server 生成的「我的二维码 / 群二维码 / 扫码登录二维码 / 邀请链接」等 URL 都基于
+`External.BaseURL` 拼接：`<BaseURL>/v1/qrcode/<code>`。**请务必显式配成对外可访问、
+且能反代到 `server:8090` 的根地址**，否则会回退成 `http://<内网 IP>:8090/v1/...`：
+
+- 既丑（暴露内网 IP+端口）；
+- 又会让客户端「扫码后判断 host 是否可信」逻辑频繁误判，导致 token 不被附带、二维码登录走不通。
+
+`.env` 已默认设置：
+
+```env
+# 与 web 容器内 nginx 的 `/api/ → server:8090/` 反代规则匹配
+TS_EXTERNAL_BASEURL=http://web.example.com/api
+# H5 域名不同的话再单独覆盖；不写默认跟随 BaseURL
+# TS_EXTERNAL_H5BASEURL=http://web.example.com
+```
+
+切换部署形态时记得同步修改：
+
+| 反代方式 | `TS_EXTERNAL_BASEURL` |
+| --- | --- |
+| 走 web 容器 nginx 的 `/api/`（推荐） | `http://<对外域名>/api` |
+| 走宿主机 nginx 的 `/v1/` 直连 `:8090` | `http://<对外域名>` |
+| 直接暴露 `:8090` 给客户端 | `http://<对外域名>:8090` |
+
+> 改完 `TS_EXTERNAL_BASEURL` 必须重建/重启 `server`：环境变量是启动时读入的。
 
 ## 其他编排文件
 
