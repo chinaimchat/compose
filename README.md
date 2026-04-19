@@ -2,6 +2,8 @@
 
 Docker Compose 编排：唐僧叨叨（`server` / `web` / `manager`）+ MySQL + Redis + MinIO + 悟空 IM（`wukongim`）。
 
+**从零到可访问的总流程（线性教程）**：见 **[`docs/SETUP.zh.md`](docs/SETUP.zh.md)**。
+
 ## 目录与克隆建议
 
 `docker-compose.yaml` 中 `build.context` 使用**与 compose 目录同级的**源码目录，推荐本机目录结构：
