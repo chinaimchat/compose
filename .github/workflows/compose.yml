@@ -1,0 +1,47 @@
+name: compose
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "docker-compose.yaml"
+      - "seed/**"
+      - "scripts/**"
+      - ".github/workflows/compose.yml"
+  pull_request:
+    paths:
+      - "docker-compose.yaml"
+      - "seed/**"
+      - "scripts/**"
+      - ".github/workflows/compose.yml"
+  workflow_dispatch:
+
+jobs:
+  config:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: docker compose config
+        run: docker compose -f docker-compose.yaml config >/dev/null
+
+  # 拉起 MinIO 后跑 sticker-seed（与本地一致）；依赖阿里云镜像可拉取
+  sticker-seed-smoke:
+    runs-on: ubuntu-latest
+    needs: config
+    steps:
+      - uses: actions/checkout@v4
+      - name: Start MinIO only
+        run: docker compose up -d minio
+      - name: Wait for MinIO health
+        run: |
+          for i in $(seq 1 90); do
+            if docker compose exec -T minio curl -sf http://127.0.0.1:9000/minio/health/live; then
+              echo "MinIO healthy"
+              exit 0
+            fi
+            sleep 2
+          done
+          docker compose logs minio
+          exit 1
+      - name: Run sticker-seed (profile seed)
+        run: docker compose --profile seed run --rm sticker-seed

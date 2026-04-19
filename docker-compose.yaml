@@ -1,4 +1,4 @@
-version: '3.1'
+# Compose specification（无 version 字段）；需 Docker Compose V2+（支持 profiles）
 services:
   wukongim:  # 唐僧叨叨通讯服务（悟空 IM）；本地构建 sibling 源码（Dockerfile 内含 yarn build + go build）
     image: wukongim:local
@@ -93,6 +93,28 @@ services:
       retries: 3
     volumes:
       - ./miniodata:/data
+
+  # 将仓库 seed/ 同步到 MinIO 桶 file（仅 profile=seed 时参与编排，避免每次 up 都跑）
+  sticker-seed:
+    profiles: ["seed"]
+    image: minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_healthy
+    restart: "no"
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -e
+        mc alias set local http://minio:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD"
+        mc mb -p local/file 2>/dev/null || true
+        mc cp --recursive /seed/preview/sticker/ local/file/preview/sticker/
+        echo "sticker-seed: done (bucket file, prefix preview/sticker/)"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    volumes:
+      - ./seed/minio-file-bucket:/seed:ro
 
   mysql:  # mysql数据库
     image: registry.cn-shanghai.aliyuncs.com/wukongim/mysql:8.0.33

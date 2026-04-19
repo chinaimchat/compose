@@ -23,13 +23,24 @@ Docker Compose 编排：唐僧叨叨（`server` / `web` / `manager`）+ MySQL + 
 
 矢量贴纸与封面在 **`seed/minio-file-bucket/preview/sticker/`**（桶 `file` 的对象前缀 `preview/sticker/`），与库里 `sticker_store` 路径一致（约 13MB 逻辑文件）。**整份 `miniodata/` 仍不提交**（含头像与业务上传）。
 
-新环境在 `docker compose up -d` 起 MinIO 后执行一次：
+新环境在 **MinIO 已就绪**后执行一次种子（二选一）：
 
-```bash
-sh scripts/seed-sticker-store-to-minio.sh
-```
+1. **推荐（与 compose 编排一致）**：使用带 **`profiles: ["seed"]`** 的服务 **`sticker-seed`**（同一 Docker 网络访问 `minio:9000`，无需再拉 `minio/mc` 到宿主机）：
 
-详见 **`seed/README.md`**。
+   ```bash
+   docker compose up -d minio
+   docker compose --profile seed run --rm sticker-seed
+   ```
+
+   若与其它服务一并启动后再补种子，只要 MinIO 在跑即可再次执行上述 `run`（`mc cp` 可覆盖，幂等）。
+
+2. **备选**：宿主机脚本（适合不便用 compose `run` 的环境）：
+
+   ```bash
+   sh scripts/seed-sticker-store-to-minio.sh
+   ```
+
+详见 **`seed/README.md`**。CI 在 **`.github/workflows/compose.yml`** 中对 `docker compose config` 与 **`sticker-seed` 冒烟**（仅 MinIO + seed）做校验。
 
 ## 环境变量（`.env`）
 
