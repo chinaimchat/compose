@@ -1,34 +1,46 @@
 #!/usr/bin/env sh
-# 新机器「尽量一键」：写入公网 IP（及可选用户端 Web 根地址），检查同级仓库，再 build / up / 贴纸种子。
-# 不能代替：强密码、HTTPS 证书、宿主机 Nginx、阿里云镜像可达性等，见 docs/SETUP.zh.md。
+# 新机器「尽量一键」：可选自动克隆同级仓库（GitHub chinaimchat 组织），写公网 IP / 可选 CLIENT_WEB_URL，再 build / up / 贴纸种子。
+# 默认克隆地址见下方 CHINAIM_*_URL；可用环境变量覆盖（自建镜像站时）。
+# 不能代替：强密码、HTTPS、宿主机 Nginx、阿里云镜像可达性等，见 docs/SETUP.zh.md。
 set -eu
 
 ROOT="$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)"
-cd "$ROOT"
+PARENT="$(CDPATH= cd -- "$ROOT/.." && pwd)"
+
+# 与 docker-compose.yaml 中 build.context 目录名一致（GitHub 仓库名未必同名）
+CHINAIM_ORG="${CHINAIM_ORG:-chinaimchat}"
+CHINAIM_WUKONGIM_URL="${CHINAIM_WUKONGIM_URL:-https://github.com/${CHINAIM_ORG}/wukongim.git}"
+CHINAIM_SERVER_URL="${CHINAIM_SERVER_URL:-https://github.com/${CHINAIM_ORG}/server.git}"
+CHINAIM_WEB_URL="${CHINAIM_WEB_URL:-https://github.com/${CHINAIM_ORG}/web.git}"
+CHINAIM_MANAGER_URL="${CHINAIM_MANAGER_URL:-https://github.com/${CHINAIM_ORG}/manager.git}"
 
 usage() {
-  echo "用法: $0 <公网IP> [用户端Web根地址，可选]" >&2
+  echo "用法: $0 [--clone] [--skip-build] [--skip-seed] <公网IPv4> [用户端Web根地址，可选]" >&2
   echo "示例:" >&2
-  echo "  $0 203.0.113.10" >&2
+  echo "  $0 --clone 203.0.113.10" >&2
   echo "  $0 203.0.113.10 https://im.example.com" >&2
-  echo "选项:" >&2
-  echo "  --skip-build   跳过 docker compose build" >&2
-  echo "  --skip-seed    跳过贴纸种子" >&2
+  echo "说明:" >&2
+  echo "  --clone  若缺少同级 wukongim / chinaim-server / chinaim-web / chinaim-manager，则从 GitHub 克隆（默认组织 ${CHINAIM_ORG}）。" >&2
+  echo "  仓库对应: wukongim、server→chinaim-server、web→chinaim-web、manager→chinaim-manager（目录名与 compose 一致）。" >&2
+  echo "  可用 CHINAIM_ORG / CHINAIM_*_URL 覆盖克隆地址。" >&2
   exit 1
 }
 
 SKIP_BUILD=0
 SKIP_SEED=0
-ARGS=""
+DO_CLONE=0
+POSITIONAL=""
 for a in "$@"; do
   case "$a" in
     --skip-build) SKIP_BUILD=1 ;;
     --skip-seed) SKIP_SEED=1 ;;
-    *) ARGS="$ARGS ${a}" ;;
+    --clone) DO_CLONE=1 ;;
+    -h|--help) usage ;;
+    *) POSITIONAL="$POSITIONAL $a" ;;
   esac
 done
 # shellcheck disable=SC2086
-set -- $ARGS
+set -- $POSITIONAL
 
 [ "${1:-}" != "" ] || usage
 PUBLIC_IP="$1"
@@ -38,16 +50,38 @@ case "$PUBLIC_IP" in
   *[!0-9.]*|'') echo "第一个参数须为公网 IPv4，例如 203.0.113.10（不要用域名填这里）" >&2; exit 1 ;;
 esac
 
+clone_if_missing() {
+  _dir="$1"
+  _url="$2"
+  if [ -d "$PARENT/$_dir/.git" ] || [ -d "$PARENT/$_dir" ]; then
+    echo "已存在: $PARENT/$_dir"
+    return 0
+  fi
+  echo "克隆 $_url -> $PARENT/$_dir"
+  git -C "$PARENT" clone --depth 1 "$_url" "$_dir"
+}
+
+if [ "$DO_CLONE" = 1 ]; then
+  command -v git >/dev/null 2>&1 || { echo "需要 git（--clone）" >&2; exit 1; }
+  clone_if_missing wukongim "$CHINAIM_WUKONGIM_URL"
+  clone_if_missing chinaim-server "$CHINAIM_SERVER_URL"
+  clone_if_missing chinaim-web "$CHINAIM_WEB_URL"
+  clone_if_missing chinaim-manager "$CHINAIM_MANAGER_URL"
+  echo
+fi
+
 for d in wukongim chinaim-server chinaim-web chinaim-manager; do
-  if [ ! -d "$ROOT/../$d" ]; then
-    echo "缺少同级目录: $ROOT/../$d（请先按 README 克隆五个仓库）" >&2
+  if [ ! -d "$PARENT/$d" ]; then
+    echo "缺少同级目录: $PARENT/$d" >&2
+    echo "请先克隆，或带上 --clone（默认从 https://github.com/${CHINAIM_ORG}/ 拉 server/web/manager/wukongim）。" >&2
     exit 1
   fi
 done
 
-[ -f "$ROOT/.env" ] || { echo "缺少 $ROOT/.env" >&2; exit 1; }
+cd "$ROOT"
 
-# 若示例密码仍为 *，避免误部署弱口令（可手工改 .env 后再跑）
+[ -f "$ROOT/.env" ] || { echo "缺少 $ROOT/.env（compose 仓库内应有一份模板）" >&2; exit 1; }
+
 if grep -E '^MYSQL_ROOT_PASSWORD=\*+$' "$ROOT/.env" >/dev/null 2>&1 \
   || grep -E '^MINIO_ROOT_PASSWORD=\*+$' "$ROOT/.env" >/dev/null 2>&1 \
   || grep -E '^WK_JWT_SECRET=\*+$' "$ROOT/.env" >/dev/null 2>&1 \
@@ -61,7 +95,6 @@ TS_WEB_PORT="${TS_WEB_PORT:-82}"
 TS_API_PORT="$(grep -E '^TS_API_PORT=' "$ROOT/.env" | tail -n1 | sed 's/^TS_API_PORT=//')"
 TS_API_PORT="${TS_API_PORT:-8090}"
 
-# 就地更新 EXTERNAL_IP 与 MinIO 下载地址（与模板 *** 或旧值兼容）
 if command -v sed >/dev/null 2>&1; then
   sed -i.bak "s|^EXTERNAL_IP=.*|EXTERNAL_IP=${PUBLIC_IP}|" "$ROOT/.env"
   sed -i.bak "s|^TS_MINIO_DOWNLOADURL=.*|TS_MINIO_DOWNLOADURL=http://${PUBLIC_IP}:9000|" "$ROOT/.env"

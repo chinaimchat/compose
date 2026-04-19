@@ -3,7 +3,7 @@
 Docker Compose 编排：唐僧叨叨（`server` / `web` / `manager`）+ MySQL + Redis + MinIO + 悟空 IM（`wukongim`）。
 
 **从零到可访问的总流程（线性教程）**：见 **[`docs/SETUP.zh.md`](docs/SETUP.zh.md)**。  
-**近似一键（IP + 可选用户端 URL，需已克隆五仓库且 `.env` 非弱口令）**：`sh scripts/bootstrap-new-host.sh <公网IP> [https://你的用户端域名]`。
+**近似一键（IP + 可选用户端 URL；`.env` 须已改强密码）**：`sh scripts/bootstrap-new-host.sh [--clone] <公网IP> [https://你的用户端域名]`。`--clone` 会从 **GitHub [`chinaimchat`](https://github.com/chinaimchat)** 拉 `wukongim`、`server`→`chinaim-server`、`web`、`manager`（目录名与 compose 一致）。详见 **`docs/SETUP.zh.md`** 第三节表格。
 
 ## 目录与克隆建议
 

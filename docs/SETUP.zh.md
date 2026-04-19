@@ -28,16 +28,27 @@
 
 ## 三、目录怎么摆（必须）
 
-与 **`docker-compose.yaml` 里 `build.context` 一致**，在**同一父目录**下克隆：
+与 **`docker-compose.yaml` 里 `build.context` 一致**，在**同一父目录**下要有这五个目录名（GitHub 组织 **`chinaimchat`**，与当前推送地址一致）：
 
-```text
-<父目录>/
-  compose/
-  wukongim/
-  chinaim-server/
-  chinaim-web/
-  chinaim-manager/
+| 本地目录名 | GitHub 仓库 |
+|------------|-------------|
+| `compose/` | https://github.com/chinaimchat/compose |
+| `wukongim/` | https://github.com/chinaimchat/wukongim |
+| `chinaim-server/` | https://github.com/chinaimchat/**server**（克隆时目录名须为 `chinaim-server`） |
+| `chinaim-web/` | https://github.com/chinaimchat/**web** |
+| `chinaim-manager/` | https://github.com/chinaimchat/**manager** |
+
+手动克隆示例（在父目录执行）：
+
+```bash
+git clone https://github.com/chinaimchat/compose.git
+git clone https://github.com/chinaimchat/wukongim.git
+git clone https://github.com/chinaimchat/server.git chinaim-server
+git clone https://github.com/chinaimchat/web.git chinaim-web
+git clone https://github.com/chinaimchat/manager.git chinaim-manager
 ```
+
+也可只先克隆 **`compose`**，在 **`compose/`** 里编辑好 `.env` 后使用 **`scripts/bootstrap-new-host.sh --clone <公网IP>`**，脚本会按上表自动 `git clone` 缺的四个目录（默认 `CHINAIM_ORG=chinaimchat`，可用环境变量改组织或各仓库 URL）。
 
 路径不对就改 compose 里各服务的 `context`，否则 `docker compose build` 会失败。
 
@@ -72,10 +83,12 @@ docker compose up -d
 sh scripts/bootstrap-new-host.sh 你的公网IP
 # 若用户端用 HTTPS 域名访问 Web，可同时写入 CLIENT_WEB_URL：
 sh scripts/bootstrap-new-host.sh 你的公网IP https://im.example.com
+# 若同级尚未克隆 wukongim / chinaim-server 等，可加 --clone（默认从 GitHub 组织 chinaimchat 拉取）：
+sh scripts/bootstrap-new-host.sh --clone 你的公网IP
 ```
 
-脚本会：检查同级 `wukongim` 等目录 → 写 **`EXTERNAL_IP`**、**`TS_MINIO_DOWNLOADURL`**（`http://IP:9000`）→（可选）**`CLIENT_WEB_URL`** → **`docker compose build` + `up -d`** → 等 MinIO 健康后跑 **`sticker-seed`**。  
-**不会**替你生成强密码；若 `.env` 里仍是仓库模板那种纯 `*` 密码会直接退出。可选 `--skip-build` / `--skip-seed` 见脚本内 `usage`。
+脚本会：可选 **`git clone` 四个业务仓库**（`--clone`）→ 检查同级目录 → 写 **`EXTERNAL_IP`**、**`TS_MINIO_DOWNLOADURL`**（`http://IP:9000`）→（可选）**`CLIENT_WEB_URL`** → **`docker compose build` + `up -d`** → 等 MinIO 健康后跑 **`sticker-seed`**。  
+**不会**替你生成强密码；若 `.env` 里仍是仓库模板那种纯 `*` 密码会直接退出。可选 `--skip-build` / `--skip-seed`；克隆地址可用 **`CHINAIM_ORG`** / **`CHINAIM_WUKONGIM_URL`** 等覆盖，见 **`scripts/bootstrap-new-host.sh --help`**。
 
 ### 3. 表情商店贴纸种子（只做一次即可，可重复执行）
 
