@@ -1,5 +1,5 @@
-# 本地真实密钥（勿提交）
-.env.private
+# 本地真实密钥（勿提交）；推送到 GitHub 的是脱敏模板 .env.private
+.env
 
 # 宿主机 Nginx 反代（含真实域名；请用 http-reverse-proxy.conf.example 复制后本地编辑）
 http-reverse-proxy.conf
