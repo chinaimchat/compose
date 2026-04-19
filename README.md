@@ -19,6 +19,18 @@ Docker Compose 编排：唐僧叨叨（`server` / `web` / `manager`）+ MySQL + 
 
 主栈 `wukongim` 使用**本地镜像构建**（`image: wukongim:local`），不在 compose 里拉取阿里云 IM 镜像；构建逻辑与 `wukongim` 仓库根目录 `Dockerfile` 一致（容器内先打 `web/`、`demo/chatdemo/` 再 `go build`）。
 
+### 表情商店贴纸（MinIO 种子，已进 Git）
+
+矢量贴纸与封面在 **`seed/minio-file-bucket/preview/sticker/`**（桶 `file` 的对象前缀 `preview/sticker/`），与库里 `sticker_store` 路径一致（约 13MB 逻辑文件）。**整份 `miniodata/` 仍不提交**（含头像与业务上传）。
+
+新环境在 `docker compose up -d` 起 MinIO 后执行一次：
+
+```bash
+sh scripts/seed-sticker-store-to-minio.sh
+```
+
+详见 **`seed/README.md`**。
+
 ## 环境变量（`.env`）
 
 - 仓库中的 `.env` 为**脱敏示例**（敏感位为 `*`），仅说明变量含义与格式。
