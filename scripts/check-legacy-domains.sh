@@ -22,9 +22,9 @@ if ! command -v rg >/dev/null 2>&1; then
 fi
 
 if rg -n "${PATTERNS}" \
-  "${BASE_DIR}/chinaim-web" \
-  "${BASE_DIR}/chinaim-manager" \
-  "${BASE_DIR}/chinaim-server" \
+  "${BASE_DIR}/web" \
+  "${BASE_DIR}/manager" \
+  "${BASE_DIR}/server" \
   --glob '!**/.git/**' \
   --glob '!**/node_modules/**' \
   --glob '!**/dist/**' \

@@ -1,10 +1,13 @@
 # Compose specification（无 version 字段）；需 Docker Compose V2+（支持 profiles）
+# 业务镜像由宿主机先手动构建再 up：见各仓库 Dockerfile，例如
+#   cd ../wukongim && docker build -t wukongim:local -f Dockerfile .
+#   cd ../server && docker build -t server:v1 -f Dockerfile .
+#   cd ../web && docker build -t web:v1 -f Dockerfile .
+#   cd ../manager && docker build -t houtai:v1 -f Dockerfile .
+# 然后在本目录执行：docker compose up -d
 services:
-  wukongim:  # 唐僧叨叨通讯服务（悟空 IM）；本地构建 sibling 源码（Dockerfile 内含 yarn build + go build）
+  wukongim:  # 唐僧叨叨通讯服务（悟空 IM）；镜像需本地预先 docker build -t wukongim:local
     image: wukongim:local
-    build:
-      context: ../wukongim
-      dockerfile: Dockerfile
     restart: always
     ports:
       # - "5001:5001" # http api端口（业务端调用，仅限内网开放）
@@ -18,11 +21,8 @@ services:
     environment:
       - WK_EXTERNAL_IP=${EXTERNAL_IP}
 
-  server:  # 唐僧叨叨的业务服务
+  server:  # 唐僧叨叨的业务服务（镜像需本地预先 docker build -t server:v1）
     image: server:v1
-    build:
-      context: ../chinaim-server
-      dockerfile: Dockerfile
     restart: always
     command: "api"
     healthcheck:
@@ -52,11 +52,8 @@ services:
       - TS_MINIO_ACCESSKEYID=${MINIO_ROOT_USER}
       - TS_MINIO_SECRETACCESSKEY=${MINIO_ROOT_PASSWORD}
 
-  web:  # 唐僧叨叨的web服务
+  web:  # 唐僧叨叨的web服务（镜像需本地预先 docker build -t web:v1）
     image: web:v1
-    build:
-      context: ../chinaim-web
-      dockerfile: Dockerfile
     restart: always
     environment:
       - API_URL=${INTERNAL_API_URL:-http://server:8090/}
@@ -64,11 +61,8 @@ services:
     ports:
       - "${TS_WEB_PORT}:80"
 
-  manager:  # 唐僧叨叨的后台管理系统
+  manager:  # 唐僧叨叨的后台管理系统（镜像需本地预先 docker build -t houtai:v1）
     image: houtai:v1
-    build:
-      context: ../chinaim-manager
-      dockerfile: Dockerfile
     restart: always
     environment:
       - API_URL=${INTERNAL_API_URL:-http://server:8090/}

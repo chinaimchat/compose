@@ -20,8 +20,8 @@ usage() {
   echo "  $0 --clone 203.0.113.10" >&2
   echo "  $0 203.0.113.10 https://im.example.com" >&2
   echo "说明:" >&2
-  echo "  --clone  若缺少同级 wukongim / chinaim-server / chinaim-web / chinaim-manager，则从 GitHub 克隆（默认组织 ${CHINAIM_ORG}）。" >&2
-  echo "  仓库对应: wukongim、server→chinaim-server、web→chinaim-web、manager→chinaim-manager（目录名与 compose 一致）。" >&2
+  echo "  --clone  若缺少同级 wukongim / server / web / manager，则从 GitHub 克隆（默认组织 ${CHINAIM_ORG}）。" >&2
+  echo "  仓库对应: wukongim、server、web、manager（目录名与 docker-compose.yaml 中 build.context 一致）。" >&2
   echo "  可用 CHINAIM_ORG / CHINAIM_*_URL 覆盖克隆地址。" >&2
   exit 1
 }
@@ -64,13 +64,13 @@ clone_if_missing() {
 if [ "$DO_CLONE" = 1 ]; then
   command -v git >/dev/null 2>&1 || { echo "需要 git（--clone）" >&2; exit 1; }
   clone_if_missing wukongim "$CHINAIM_WUKONGIM_URL"
-  clone_if_missing chinaim-server "$CHINAIM_SERVER_URL"
-  clone_if_missing chinaim-web "$CHINAIM_WEB_URL"
-  clone_if_missing chinaim-manager "$CHINAIM_MANAGER_URL"
+  clone_if_missing server "$CHINAIM_SERVER_URL"
+  clone_if_missing web "$CHINAIM_WEB_URL"
+  clone_if_missing manager "$CHINAIM_MANAGER_URL"
   echo
 fi
 
-for d in wukongim chinaim-server chinaim-web chinaim-manager; do
+for d in wukongim server web manager; do
   if [ ! -d "$PARENT/$d" ]; then
     echo "缺少同级目录: $PARENT/$d" >&2
     echo "请先克隆，或带上 --clone（默认从 https://github.com/${CHINAIM_ORG}/ 拉 server/web/manager/wukongim）。" >&2
@@ -119,9 +119,13 @@ echo "若使用域名访问 Web，请仍检查 .env 中 WEB_SERVER_NAME / MANAGE
 echo
 
 if [ "$SKIP_BUILD" = 0 ]; then
-  docker compose build
+  echo "按本仓库约定：在各源码目录 docker build 固定 tag，再 compose up。"
+  docker build -t wukongim:local -f "$PARENT/wukongim/Dockerfile" "$PARENT/wukongim"
+  docker build -t server:v1 -f "$PARENT/server/Dockerfile" "$PARENT/server"
+  docker build -t web:v1 -f "$PARENT/web/Dockerfile" "$PARENT/web"
+  docker build -t houtai:v1 -f "$PARENT/manager/Dockerfile" "$PARENT/manager"
 else
-  echo "[--skip-build] 跳过 build"
+  echo "[--skip-build] 跳过镜像构建（请已手动打好 wukongim:local / server:v1 / web:v1 / houtai:v1）"
 fi
 
 docker compose up -d

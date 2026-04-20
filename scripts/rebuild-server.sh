@@ -16,11 +16,12 @@
 #   sh scripts/rebuild-server.sh --no-build          # 仅重建（不重新打镜像）
 #   sh scripts/rebuild-server.sh --pull              # 重新构建时拉取上游基础镜像
 #
-# 也可以一次到位：
-#   docker compose up -d --build --force-recreate server web manager
+# 也可以一次到位（先打镜像再 up）：
+#   docker build -t server:v1 -f ../server/Dockerfile ../server && docker compose up -d --force-recreate server web manager
 set -eu
 
 ROOT="$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)"
+PARENT="$(CDPATH= cd -- "$ROOT/.." && pwd)"
 cd "$ROOT"
 
 BUILD=1
@@ -39,7 +40,8 @@ done
 
 echo "==> [1/3] 重新构建并重建 server"
 if [ "$BUILD" = "1" ]; then
-  docker compose up -d --build $PULL_FLAG --force-recreate server
+  docker build $PULL_FLAG -t server:v1 -f "$PARENT/server/Dockerfile" "$PARENT/server"
+  docker compose up -d --no-build --force-recreate server
 else
   # --no-build：明确禁用本次构建并跳过依赖（wukongim 等），只用既有镜像 recreate server。
   # 这样能确保仅是 .env / docker-compose.yaml 的环境变量调整也能让 server 重新读取，

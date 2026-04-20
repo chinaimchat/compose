@@ -34,23 +34,23 @@
 |------------|-------------|
 | `compose/` | https://github.com/chinaimchat/compose |
 | `wukongim/` | https://github.com/chinaimchat/wukongim |
-| `chinaim-server/` | https://github.com/chinaimchat/**server**（克隆时目录名须为 `chinaim-server`） |
-| `chinaim-web/` | https://github.com/chinaimchat/**web** |
-| `chinaim-manager/` | https://github.com/chinaimchat/**manager** |
+| `server/` | https://github.com/chinaimchat/**server** |
+| `web/` | https://github.com/chinaimchat/**web** |
+| `manager/` | https://github.com/chinaimchat/**manager** |
 
 手动克隆示例（在父目录执行）：
 
 ```bash
 git clone https://github.com/chinaimchat/compose.git
 git clone https://github.com/chinaimchat/wukongim.git
-git clone https://github.com/chinaimchat/server.git chinaim-server
-git clone https://github.com/chinaimchat/web.git chinaim-web
-git clone https://github.com/chinaimchat/manager.git chinaim-manager
+git clone https://github.com/chinaimchat/server.git
+git clone https://github.com/chinaimchat/web.git
+git clone https://github.com/chinaimchat/manager.git
 ```
 
 也可只先克隆 **`compose`**，在 **`compose/`** 里编辑好 `.env` 后使用 **`scripts/bootstrap-new-host.sh --clone <公网IP>`**，脚本会按上表自动 `git clone` 缺的四个目录（默认 `CHINAIM_ORG=chinaimchat`，可用环境变量改组织或各仓库 URL）。
 
-路径不对就改 compose 里各服务的 `context`，否则 `docker compose build` 会失败。
+路径不对就改各仓库 `Dockerfile` 或本目录 `docker-compose.yaml` 中 `image:` 名；手动 `docker build` 须在正确源码目录执行。
 
 ---
 
@@ -58,7 +58,7 @@ git clone https://github.com/chinaimchat/manager.git chinaim-manager
 
 ### 1. 准备环境变量
 
-- 使用仓库里的 **`.env` 模板**（占位符、脱敏），复制后改成你的 **公网 IP/域名、强密码、JWT** 等。
+- 使用仓库里的 **`.env.example`**：`cp .env.example .env`，再改成你的 **公网 IP/域名、强密码、JWT** 等。
 - **不要**把含真实密码的 `.env` 推 Git；本地备份可用 **`.env.private`**（已在 `.gitignore`）。
 - 与头像、表情商店相关的常用项：
   - **`TS_AVATAR_DEFAULTBASEURL`**：注册时默认头像图片来源（不配则用程序内置 Dicebear）；与现网一致就填同一套。
@@ -69,11 +69,15 @@ git clone https://github.com/chinaimchat/manager.git chinaim-manager
 在 **`compose/`** 目录：
 
 ```bash
-docker compose build
-docker compose up -d
+# 先在各源码目录执行（与 compose 中 image tag 一致），再启动：
+#   cd ../wukongim && docker build -t wukongim:local -f Dockerfile .
+#   cd ../server && docker build -t server:v1 -f Dockerfile .
+#   cd ../web && docker build -t web:v1 -f Dockerfile .
+#   cd ../manager && docker build -t houtai:v1 -f Dockerfile .
+cd ../compose && docker compose up -d
 ```
 
-首次构建会编 **wukongim**（Dockerfile 内含前端 `yarn build` + Go）、**server / web / manager** 等，耗时正常偏长。
+首次打镜像会编 **wukongim**（Dockerfile 内含前端 `yarn build` + Go）、**server / web / manager** 等，耗时正常偏长；也可用 **`scripts/bootstrap-new-host.sh`**（默认内含上述 `docker build`）。
 
 #### 近似「一键」（已克隆五仓库、`.env` 已改好强密码后）
 
@@ -83,11 +87,11 @@ docker compose up -d
 sh scripts/bootstrap-new-host.sh 你的公网IP
 # 若用户端用 HTTPS 域名访问 Web，可同时写入 CLIENT_WEB_URL：
 sh scripts/bootstrap-new-host.sh 你的公网IP https://im.example.com
-# 若同级尚未克隆 wukongim / chinaim-server 等，可加 --clone（默认从 GitHub 组织 chinaimchat 拉取）：
+# 若同级尚未克隆 wukongim / server 等，可加 --clone（默认从 GitHub 组织 chinaimchat 拉取）：
 sh scripts/bootstrap-new-host.sh --clone 你的公网IP
 ```
 
-脚本会：可选 **`git clone` 四个业务仓库**（`--clone`）→ 检查同级目录 → 写 **`EXTERNAL_IP`**、**`TS_MINIO_DOWNLOADURL`**（`http://IP:9000`）→（可选）**`CLIENT_WEB_URL`** → **`docker compose build` + `up -d`** → 等 MinIO 健康后跑 **`sticker-seed`**。  
+脚本会：可选 **`git clone` 四个业务仓库**（`--clone`）→ 检查同级目录 → 写 **`EXTERNAL_IP`**、**`TS_MINIO_DOWNLOADURL`**（`http://IP:9000`）→（可选）**`CLIENT_WEB_URL`** → **`docker build` 四个业务镜像** + **`docker compose up -d`** → 等 MinIO 健康后跑 **`sticker-seed`**。  
 **不会**替你生成强密码；若 `.env` 里仍是仓库模板那种纯 `*` 密码会直接退出。可选 `--skip-build` / `--skip-seed`；克隆地址可用 **`CHINAIM_ORG`** / **`CHINAIM_WUKONGIM_URL`** 等覆盖，见 **`scripts/bootstrap-new-host.sh --help`**。
 
 ### 3. 表情商店贴纸种子（只做一次即可，可重复执行）
@@ -138,15 +142,15 @@ cp http-reverse-proxy.conf.example http-reverse-proxy.conf
 | compose 常用说明、反代、贴纸索引 | 仓库根 **`README.md`** |
 | 贴纸种子说明 | **`seed/README.md`** |
 | 悟空 IM 本地构建（非 Docker 时） | **`wukongim` 仓库** `README_CN.md` / `Makefile`（`make build-native`） |
-| Web 镜像分层与提速 | **`chinaim-web` 仓库** `README.md` |
-| 业务配置示例 | **`chinaim-server`** 下 `docker/tsdd/configs/tsdd.yaml`、`/.env.example` |
+| Web 镜像分层与提速 | **`web` 仓库** `README.md` |
+| 业务配置示例 | **`server`** 下 `docker/tsdd/configs/tsdd.yaml`、`/.env.example` |
 | CI | **`compose`** `.github/workflows/compose.yml`（compose 校验 + MinIO 冒烟种子） |
 
 ---
 
 ## 七、常见问题（一句话）
 
-- **只 clone 了 compose 起不来**：缺同级 **`wukongim` / `chinaim-server` / `chinaim-web` / `chinaim-manager`**。  
+- **只 clone 了 compose 起不来**：缺同级 **`wukongim` / `server` / `web` / `manager`**。  
 - **表情商店空白**：未跑 **sticker-seed** 或 MinIO 未就绪。  
 - **拉镜像失败**：检查到 **阿里云 registry** 的网络；或改公共镜像。  
 - **注册后头像异常**：检查 **`TS_AVATAR_DEFAULTBASEURL`** 与出网；失败时会走 MinIO 默认图路径，需自行预置或修网络。

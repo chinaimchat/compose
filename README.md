@@ -3,7 +3,7 @@
 Docker Compose 编排：唐僧叨叨（`server` / `web` / `manager`）+ MySQL + Redis + MinIO + 悟空 IM（`wukongim`）。
 
 **从零到可访问的总流程（线性教程）**：见 **[`docs/SETUP.zh.md`](docs/SETUP.zh.md)**。  
-**近似一键（IP + 可选用户端 URL；`.env` 须已改强密码）**：`sh scripts/bootstrap-new-host.sh [--clone] <公网IP> [https://你的用户端域名]`。`--clone` 会从 **GitHub [`chinaimchat`](https://github.com/chinaimchat)** 拉 `wukongim`、`server`→`chinaim-server`、`web`、`manager`（目录名与 compose 一致）。详见 **`docs/SETUP.zh.md`** 第三节表格。
+**近似一键（IP + 可选用户端 URL；`.env` 须已改强密码）**：`sh scripts/bootstrap-new-host.sh [--clone] <公网IP> [https://你的用户端域名]`。`--clone` 会从 **GitHub [`chinaimchat`](https://github.com/chinaimchat)** 拉 `wukongim`、`server`、`web`、`manager`（与 `docker-compose.yaml` 中 `build.context` 目录名一致）。详见 **`docs/SETUP.zh.md`** 第三节表格。
 
 ## 目录与克隆建议
 
@@ -13,9 +13,9 @@ Docker Compose 编排：唐僧叨叨（`server` / `web` / `manager`）+ MySQL + 
 <工作区父目录>/
   compose/              # 本仓库
   wukongim/             # 悟空 IM 源码（`wukongim` 服务 `build.context` 指向此处）
-  chinaim-server/       # 业务后端
-  chinaim-web/          # 用户端 Web
-  chinaim-manager/      # 管理后台
+  server/               # 业务后端
+  web/                  # 用户端 Web
+  manager/              # 管理后台
 ```
 
 若路径不同，请修改 `docker-compose.yaml` 里各服务的 `build.context`。
@@ -47,8 +47,8 @@ Docker Compose 编排：唐僧叨叨（`server` / `web` / `manager`）+ MySQL + 
 
 ## 环境变量（`.env`）
 
-- 仓库中的 `.env` 为**脱敏示例**（敏感位为 `*`），仅说明变量含义与格式。
-- 部署时：复制为 `.env` 后填入真实密码、公网 IP、JWT 密钥等。
+- 仓库提供 **`.env.example`** 为**脱敏模板**（敏感位为 `*`），仅说明变量含义与格式。
+- 部署时：`cp .env.example .env` 后填入真实密码、公网 IP、JWT 密钥等（**`.env` 已列入 `.gitignore`，勿提交**）。
 - **切勿**将含真实密码的 `.env` 推送到公开仓库；本地可自行保留 `.env.private` 备份（已在 `.gitignore` 中忽略）。
 
 ### 宿主机 Nginx 反代（可选）
@@ -58,6 +58,7 @@ Docker Compose 编排：唐僧叨叨（`server` / `web` / `manager`）+ MySQL + 
 | 文件 | 是否提交 Git | 说明 |
 |------|----------------|------|
 | **`http-reverse-proxy.conf.example`** | **是** | 占位域名 `im.example.com`、`admin.example.com`，上游为 `host.docker.internal`（与常见 Docker Desktop 一致）。 |
+| **`docs/nginx-host-http-mb4au.conf`** | **是** | 示例：`mb4au.com`/`www`→本机 **82**、`houtai.mb4au.com`→**83**，上游 **127.0.0.1**；文件末注释含 App 常用 API/IM 地址。 |
 | **`http-reverse-proxy.conf`** | **否**（`.gitignore`） | 由示例复制后本地修改，写入真实域名；**勿提交**，避免泄露生产域名与拓扑。 |
 
 初始化命令：
@@ -80,14 +81,15 @@ cp http-reverse-proxy.conf.example http-reverse-proxy.conf
   - `WEB_SERVER_NAME`（web 容器 Nginx `server_name`）
   - `MANAGER_SERVER_NAME`（manager 容器 Nginx `server_name`）
 
-改完 `.env` 后重建：
+改完 `.env` 后重建镜像并启动（在对应源码目录 `docker build`，再在 `compose/` 里 `up`）：
 
 ```bash
-docker compose build web manager
-docker compose up -d web manager
+cd ../web && docker build -t web:v1 -f Dockerfile .
+cd ../manager && docker build -t houtai:v1 -f Dockerfile .
+cd ../compose && docker compose up -d web manager
 ```
 
-**Web 镜像构建提速**：`chinaim-web` 的 `Dockerfile` 已将 `yarn install` 与源码分层，并启用 Yarn 缓存挂载；日常重建 **Web** 请用 `docker compose build web`，**避免习惯性加 `--no-cache`**，否则会整包重装依赖。若新增 `apps/*` / `packages/*` workspace，需在 `chinaim-web/Dockerfile` 中补充对应 `COPY …/package.json` 行（详见 **`../chinaim-web/README.md`** 中「Docker 镜像构建（提速与维护）」）。
+**Web 镜像构建提速**：`web` 仓库的 `Dockerfile` 已将 `yarn install` 与源码分层，并启用 Yarn 缓存挂载；日常重建请用 **`docker build -t web:v1 -f Dockerfile .`（在 `web/` 目录）**，**避免习惯性加 `--no-cache`**，否则会整包重装依赖。若新增 `apps/*` / `packages/*` workspace，需在 `web/Dockerfile` 中补充对应 `COPY …/package.json` 行（详见 **`../web/README.md`** 中「Docker 镜像构建（提速与维护）」）。
 
 ### 发布前域名残留检查
 
@@ -104,23 +106,24 @@ sh compose/scripts/check-legacy-domains.sh old-domain.com test.example.com
 
 ## 常用命令
 
-在项目根目录（本仓库）执行：
+本机约定：**先在各源码目录手动 `docker build` 出 `wukongim:local`、`server:v1`、`web:v1`、`houtai:v1`**（见 `docker-compose.yaml` 顶部注释），再在本仓库执行：
 
 ```bash
-docker compose build
 docker compose up -d
 ```
+
+如需让 Compose 自动构建（旧习惯），可自行在 `docker-compose.yaml` 里为对应服务恢复 `build:` 段。
 
 仅重建管理后台示例：
 
 ```bash
-docker compose build manager && docker compose up -d manager
+cd ../manager && docker build -t houtai:v1 -f Dockerfile . && cd ../compose && docker compose up -d manager
 ```
 
 仅重建用户端 Web（依赖未改时通常较快）：
 
 ```bash
-docker compose build web && docker compose up -d web
+cd ../web && docker build -t web:v1 -f Dockerfile . && cd ../compose && docker compose up -d web
 ```
 
 ### ⚠️ 重新构建 / 重建 `server` 时必须连同 `web` `manager` 一起重启
@@ -135,15 +138,16 @@ docker compose build web && docker compose up -d web
 **两种推荐做法（任选其一）：**
 
 ```bash
-# 1) 一行命令：连同 web、manager 一并强制重建，让它们重新解析 server 的 IP
-docker compose up -d --build --force-recreate server web manager
+# 1) 先打 server 镜像，再连同 web、manager 一并强制重建，让它们重新解析 server 的 IP
+cd ../server && docker build -t server:v1 -f Dockerfile .
+cd ../compose && docker compose up -d --force-recreate server web manager
 
-# 2) 分步骤：用仓库自带脚本（先重建 server，等 healthy 后重启 web、manager）
-sh scripts/rebuild-server.sh            # = build + recreate server，再 restart web manager
+# 2) 分步骤：用仓库自带脚本（先 docker build server，等 healthy 后重启 web、manager）
+sh scripts/rebuild-server.sh            # = build server 镜像 + recreate server，再 restart web manager
 sh scripts/rebuild-server.sh --no-build # 仅 recreate server（不重新打镜像）
 ```
 
-> 不要只跑 `docker compose up -d --build server`，否则 `web` / `manager` 内
+> 不要只 `docker compose up -d --force-recreate server` 而不重启 `web`/`manager`，否则其
 > Nginx 仍会指向旧 IP。
 
 ## 管理后台「以此用户视角查看」
