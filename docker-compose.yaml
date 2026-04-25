@@ -20,6 +20,9 @@ services:
       - .env
     environment:
       - WK_EXTERNAL_IP=${EXTERNAL_IP}
+      - WK_EXTERNAL_TCPADDR=${PUBLIC_IM_HOST}:${WK_TCP_PORT}
+      - WK_EXTERNAL_WSADDR=ws://${PUBLIC_WEB_HOST}/ws
+      - WK_EXTERNAL_WSSADDR=ws://${PUBLIC_WEB_HOST}/ws
 
   server:  # 唐僧叨叨的业务服务（镜像需本地预先 docker build -t server:v1）
     image: server:v1
@@ -46,9 +49,10 @@ services:
       - TS_EXTERNAL_IP=${EXTERNAL_IP}
       # 二维码 / 邀请链接 / 扫码登录 等对外 URL 的根地址；不显式配会回退到 IP+API_PORT，
       # 导致客户端二维码里出现 http://<IP>:8090/v1/qrcode/...，既丑又泄露内部端口。
-      - TS_EXTERNAL_BASEURL=${TS_EXTERNAL_BASEURL:-http://${EXTERNAL_IP}:${TS_API_PORT}}
-      - TS_EXTERNAL_H5BASEURL=${TS_EXTERNAL_H5BASEURL:-${TS_EXTERNAL_BASEURL:-http://${EXTERNAL_IP}:${TS_API_PORT}}}
+      - TS_EXTERNAL_BASEURL=${PUBLIC_SCHEME}://${PUBLIC_DOMAIN}
+      - TS_EXTERNAL_H5BASEURL=${PUBLIC_SCHEME}://${PUBLIC_WEB_HOST}
       - TS_FILESERVICE=${TS_FILESERVICE}
+      - TS_MINIO_DOWNLOADURL=${PUBLIC_SCHEME}://${PUBLIC_WEB_HOST}:9000
       - TS_MINIO_ACCESSKEYID=${MINIO_ROOT_USER}
       - TS_MINIO_SECRETACCESSKEY=${MINIO_ROOT_PASSWORD}
 
@@ -68,7 +72,7 @@ services:
       - API_URL=${INTERNAL_API_URL:-http://server:8090/}
       - MANAGER_SERVER_NAME=${MANAGER_SERVER_NAME:-localhost}
       # 用户端 Web 对外根地址（默认与 .env 中 EXTERNAL_IP + TS_WEB_PORT 一致）；可在 .env 中单独设置 CLIENT_WEB_URL 覆盖
-      - CLIENT_WEB_URL=${CLIENT_WEB_URL:-http://${EXTERNAL_IP}:${TS_WEB_PORT}}
+      - CLIENT_WEB_URL=${PUBLIC_SCHEME}://${PUBLIC_WEB_HOST}
     ports:
       - "${TS_MANAGEMENT_PORT}:80"
 

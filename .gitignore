@@ -3,6 +3,7 @@
 
 # 宿主机 Nginx 反代（含真实域名；请用 http-reverse-proxy.conf.example 复制后本地编辑）
 http-reverse-proxy.conf
+https-reverse-proxy.conf
 
 # 数据库与对象存储数据目录（体积大、且含业务数据）
 mysqldata/
